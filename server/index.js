@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
+import Anthropic from "@anthropic-ai/sdk";
 import { EFFECTS, recommendStrains, streamChat } from "./claude.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -56,7 +57,11 @@ app.post("/api/chat", async (req, res) => {
   res.flushHeaders();
 
   const stream = streamChat(messages);
-  req.on("close", () => stream.abort());
+  // res "close" fires when the client disconnects (req "close" would fire as
+  // soon as the request body is consumed). Guard so a normal end is a no-op.
+  res.on("close", () => {
+    if (!res.writableFinished) stream.abort();
+  });
 
   stream.on("text", (delta) => {
     res.write(`data: ${JSON.stringify({ text: delta })}\n\n`);
@@ -69,7 +74,7 @@ app.post("/api/chat", async (req, res) => {
     }
     res.write("data: [DONE]\n\n");
   } catch (err) {
-    if (err?.name !== "APIUserAbortError") {
+    if (!(err instanceof Anthropic.APIUserAbortError)) {
       console.error("chat stream failed:", err);
       res.write(`data: ${JSON.stringify({ error: "Chat fehlgeschlagen." })}\n\n`);
     }
