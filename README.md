@@ -6,9 +6,11 @@ integration**: Vue 3 + Vite frontend, Express backend proxying the
 **Claude API** (Anthropic SDK) with structured outputs, prompt caching and
 streaming.
 
-> Extracted and rebuilt from a feature I shipped in a cannabis social club app
-> (Quasar/Capacitor + Node). UI language is German, matching the original
-> user base.
+> **Demo project.** This is a standalone extract of a single feature from a
+> larger production app I built and shipped (a cannabis social club platform —
+> Quasar/Capacitor + Node/Socket.IO). It exists purely to demonstrate how I
+> integrate LLM APIs; it is not a product and not intended for real-world use.
+> UI language is German, matching the original user base.
 
 ## What it does
 
@@ -106,6 +108,8 @@ client/
 
 ## Notes
 
+- Demonstration only — a feature excerpt from a larger app, not a standalone
+  product. Expect rough edges outside the showcased flows.
 - The dataset is a snapshot for demo purposes; product availability changes.
 - This is an informational demo, not medical advice.
 - Model defaults to `claude-opus-4-8`; override via `ANTHROPIC_MODEL` in `.env`.
