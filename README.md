@@ -12,6 +12,8 @@ streaming.
 > integrate LLM APIs; it is not a product and not intended for real-world use.
 > UI language is German, matching the original user base.
 
+![Strain Finder — effect-based recommendations grounded in real terpene data](docs/screenshot.png)
+
 ## What it does
 
 - **Effect-based recommendations** — pick desired effects (e.g. *entspannend*,
