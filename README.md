@@ -25,7 +25,7 @@ streaming.
 ```
 ┌─────────────┐   /api/effects            ┌──────────────┐   Messages API   ┌───────────┐
 │  Vue 3 SPA  │   /api/recommend  ──────► │   Express    │ ───────────────► │  Claude   │
-│   (Vite)    │   /api/chat (SSE) ◄────── │    proxy     │ ◄─── streaming ─ │ (Opus 4.8)│
+│   (Vite)    │   /api/chat (SSE) ◄────── │    proxy     │ ◄─── streaming ─ │(Haiku 4.5)│
 └─────────────┘                           └──────┬───────┘                  └───────────┘
                                                  │
                                           terpenes.json
@@ -112,7 +112,8 @@ client/
   product. Expect rough edges outside the showcased flows.
 - The dataset is a snapshot for demo purposes; product availability changes.
 - This is an informational demo, not medical advice.
-- Model defaults to `claude-opus-4-8`; override via `ANTHROPIC_MODEL` in `.env`.
+- Model defaults to `claude-haiku-4-5` (fast and cheap — plenty for this task);
+  override via `ANTHROPIC_MODEL` in `.env`.
 
 ## License
 

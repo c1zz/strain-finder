@@ -7,7 +7,7 @@ import { zodOutputFormat } from "@anthropic-ai/sdk/helpers/zod";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 
-const MODEL = process.env.ANTHROPIC_MODEL || "claude-opus-4-8";
+const MODEL = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5";
 
 // The API key is resolved from ANTHROPIC_API_KEY — it never leaves the server.
 const client = new Anthropic();
@@ -76,7 +76,6 @@ export async function recommendStrains(effects) {
   const response = await client.messages.parse({
     model: MODEL,
     max_tokens: 4096,
-    thinking: { type: "adaptive" },
     system: [
       { type: "text", text: RECOMMEND_SYSTEM },
       {
