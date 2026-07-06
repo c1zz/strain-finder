@@ -3,7 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
 import Anthropic from "@anthropic-ai/sdk";
-import { EFFECTS, recommendStrains, streamChat } from "./claude.js";
+import { EFFECTS, recommendStrains, streamChat, warmCache } from "./claude.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
@@ -92,4 +92,6 @@ if (fs.existsSync(dist)) {
 const port = process.env.PORT || 3000;
 app.listen(port, () => {
   console.log(`strain-finder server listening on http://localhost:${port}`);
+  // Fire and forget — a failed warm-up only means the first request is slower.
+  warmCache().catch((err) => console.warn("cache warm-up failed:", err.message));
 });

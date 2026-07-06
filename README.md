@@ -52,10 +52,19 @@ training data — it picks from a real product dataset injected into the system
 prompt. The server additionally verifies every recommended URL against the
 dataset before responding, so a hallucinated product can never reach the UI.
 
-**Prompt caching.** The ~40K-token product dataset is a static prompt prefix
-marked with `cache_control: {type: "ephemeral"}`. Repeated requests read it
-from Anthropic's prompt cache at ~10% of the input price instead of
-re-processing it every time.
+**Prompt caching + warm-up.** The ~50K-token product dataset is a static
+prompt prefix marked with `cache_control: {type: "ephemeral"}`. Repeated
+requests read it from Anthropic's prompt cache at ~10% of the input price
+instead of re-processing it every time. The server pre-warms the cache at
+boot so even the first user request skips the cold read. One subtlety worth
+knowing: structured-outputs requests have a different cacheable prefix than
+plain ones, so the warm-up must send the exact same `output_config.format`.
+
+**Lean model output.** Output tokens dominate LLM latency. The model returns
+only what it uniquely contributes — the product URL and a one-sentence
+justification; name and terpene profile are enriched server-side from the
+dataset. Together with the cache warm-up this cut response time from ~16s to
+~4s (and guarantees the displayed data matches the dataset exactly).
 
 **Streaming end-to-end.** Chat responses stream from the Claude API through
 the Express server (as server-sent events) into the Vue UI, rendering

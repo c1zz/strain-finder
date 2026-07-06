@@ -43,63 +43,109 @@ export const EFFECTS = [
   "kreativitätsfördernd",
 ];
 
+// Keep the model's output minimal — it only picks and explains. Name and
+// terpene list are enriched server-side from the dataset, which roughly
+// halves the output tokens (the dominant latency factor) and guarantees
+// the displayed data matches the dataset exactly.
 const RecommendationSchema = z.object({
   strains: z
     .array(
       z.object({
-        name: z.string().describe("Product name exactly as in the dataset"),
         url: z.string().describe("Product URL exactly as in the dataset"),
-        terpenes: z
-          .array(z.string())
-          .describe("Terpenes of this product that drive the requested effects"),
         reason: z
           .string()
           .describe(
-            "One or two German sentences explaining why this strain matches the requested effects"
+            "One short German sentence: why this strain matches the requested effects"
           ),
       })
     )
-    .describe("5 to 8 recommended strains, best match first"),
+    .describe("Exactly 5 recommended strains, best match first"),
 });
+
+// Shared by real requests and the warm-up: a structured-outputs request has a
+// different cacheable prefix than a plain one, so the warm-up must send the
+// exact same format or the cache misses.
+const RECOMMENDATION_FORMAT = zodOutputFormat(RecommendationSchema);
 
 const RECOMMEND_SYSTEM = `Du bist ein fachkundiger Assistent für medizinisches Cannabis.
 Du erhältst eine Produktdatenbank (JSON) mit Terpen-Profilen. Feldkürzel:
 "t" = Produktname, "u" = Produkt-URL, "d" = Terpene mit "t" (Name), "o" (Vorkommen), "s" (Aroma), "e" (Effekte).
 
 Regeln:
-- Empfiehl ausschließlich Produkte aus der Datenbank. Übernimm "name" und "url" exakt.
-- Wähle Produkte, deren Terpen-Effekte am besten zu den angefragten Effekten passen.
+- Empfiehl ausschließlich Produkte aus der Datenbank. Übernimm "url" exakt.
+- Wähle genau 5 Produkte, deren Terpen-Effekte am besten zu den angefragten Effekten passen.
 - Sorge für Vielfalt: Empfiehl nicht nur Produkte mit identischem Terpen-Profil.
-- Antworte auf Deutsch.`;
+- Begründungen: je ein kurzer deutscher Satz.`;
+
+// System blocks are shared between real requests and the cache warm-up —
+// they must stay byte-identical or the prompt cache misses.
+const RECOMMEND_SYSTEM_BLOCKS = [
+  { type: "text", text: RECOMMEND_SYSTEM },
+  {
+    type: "text",
+    text: `Produktdatenbank:\n${terpeneJson}`,
+    // Static ~50K-token prefix — cached across requests (~90% cheaper reads).
+    cache_control: { type: "ephemeral" },
+  },
+];
 
 export async function recommendStrains(effects) {
+  const started = Date.now();
   const response = await client.messages.parse({
     model: MODEL,
-    max_tokens: 4096,
-    system: [
-      { type: "text", text: RECOMMEND_SYSTEM },
-      {
-        type: "text",
-        text: `Produktdatenbank:\n${terpeneJson}`,
-        // Static ~40K-token prefix — cached across requests (~90% cheaper reads).
-        cache_control: { type: "ephemeral" },
-      },
-    ],
+    max_tokens: 1500,
+    system: RECOMMEND_SYSTEM_BLOCKS,
     messages: [
       {
         role: "user",
         content: `Gewünschte Effekte: ${effects.join(", ")}. Empfiehl passende Sorten.`,
       },
     ],
-    output_config: { format: zodOutputFormat(RecommendationSchema) },
+    output_config: { format: RECOMMENDATION_FORMAT },
   });
+
+  const u = response.usage;
+  console.log(
+    `recommend: ${Date.now() - started}ms | input ${u.input_tokens} | ` +
+      `cache write ${u.cache_creation_input_tokens} | cache read ${u.cache_read_input_tokens} | ` +
+      `output ${u.output_tokens}`
+  );
 
   if (response.stop_reason === "refusal" || !response.parsed_output) {
     throw new Error("Model returned no usable recommendation");
   }
 
-  // Defense in depth: drop anything not present in the dataset.
-  return response.parsed_output.strains.filter((s) => productsByUrl.has(s.url));
+  // Verify against the dataset (drops hallucinated URLs) and enrich with the
+  // authoritative product data instead of having the model repeat it.
+  return response.parsed_output.strains
+    .filter((s) => productsByUrl.has(s.url))
+    .map((s) => {
+      const product = productsByUrl.get(s.url);
+      return {
+        name: product.t,
+        url: s.url,
+        terpenes: (product.d ?? []).map((d) => d.t),
+        reason: s.reason,
+      };
+    });
+}
+
+// Pre-warm the prompt cache so the first real request doesn't pay the cold
+// read of the ~50K-token dataset. max_tokens: 0 would be ideal (prefill only)
+// but is rejected together with structured outputs, so generate a token-scrap
+// and discard it — the cache write is what matters.
+export async function warmCache() {
+  const response = await client.messages.create({
+    model: MODEL,
+    max_tokens: 8,
+    system: RECOMMEND_SYSTEM_BLOCKS,
+    messages: [{ role: "user", content: "warmup" }],
+    output_config: { format: RECOMMENDATION_FORMAT },
+  });
+  const u = response.usage;
+  console.log(
+    `cache warm-up: write ${u.cache_creation_input_tokens} | read ${u.cache_read_input_tokens}`
+  );
 }
 
 const CHAT_SYSTEM = `Du bist ein freundlicher Assistent mit fundiertem Wissen über medizinisches Cannabis,
