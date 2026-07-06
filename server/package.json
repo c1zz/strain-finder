@@ -1,0 +1,16 @@
+{
+  "name": "strain-finder-server",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Express proxy for the Claude API — keeps the API key server-side",
+  "scripts": {
+    "dev": "node --watch --env-file=.env index.js",
+    "start": "node --env-file=.env index.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.93.0",
+    "express": "^4.21.2",
+    "zod": "^3.24.1"
+  }
+}
